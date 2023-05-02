@@ -47,6 +47,13 @@ app.get("/fetch", (req, res) => {
   res.send(`a = ${a}`);
 });
 
+app.get("/register", (req, res) => {
+  const templateVars = { 
+    username: req.cookies['username']
+  }
+    res.render("register", templateVars)
+});
+
 app.post('/login', (req, res) => {
   const { username } = req.body;
   res.cookie('username', username);
