@@ -33,7 +33,7 @@ function generateRandomString() {
   return result;
 }
 
-const getUserByEmail = (email, users) => {
+const getUserByEmail = (email) => {
   for (const id in users) {
     const user = users[id];
     if (user.email === email) {
@@ -117,7 +117,7 @@ app.post("/register", (req, res) => {
     res.status(400).send("Email already exists.");
     return;
   }
-  
+
   const id = generateRandomString();
   users[id] = {
     id,
