@@ -34,8 +34,8 @@ function generateRandomString() {
 }
 
 const getUserByEmail = (email, users) => {
-  for (const userId in users) {
-    const user = users[userId];
+  for (const id in users) {
+    const user = users[id];
     if (user.email === email) {
       return user;
     }
@@ -84,36 +84,54 @@ app.get("/login", (req, res) => {
   res.render("login", templateVars);
 });
 
-/*app.post("/login", (req, res) => {
-  const { username } = req.body;
-  res.cookie("username", username);
+app.post("/login", (req, res) => {
+  const { email, password } = req.body;
+  const user = getUserByEmail(email);
+
+  if (!email || !password) {
+    return res.status(400).send("Please provide an email and password");
+  }
+
+  if (!user) {
+    return res.status(403).send("No user with that email found");
+  }
+
+  if (password !== user.password) {
+    return res.status(403).send("Password does not match");
+  }
+
+  res.cookie("user_id", user.id);
   res.redirect("/urls");
-});*/
+});
+
 
 app.post("/register", (req, res) => {
   const { email, password } = req.body;
+
   if (!email || !password) {
     res.status(400).send("Please provide both email and password.");
     return;
   }
+
   if (getUserByEmail(email, users)) {
     res.status(400).send("Email already exists.");
     return;
   }
+  
   const id = generateRandomString();
-  const newUser = {
+  users[id] = {
     id,
     email,
     password
   };
-  users[id] = newUser;
+
   res.cookie("user_id", id);
   res.redirect("/urls");
 });
 
 app.post("/logout", (req, res) => {
   res.clearCookie("user_id");
-  res.redirect("/urls");
+  res.redirect("/login");
 });
 
 app.get("/urls", (req, res) => {
