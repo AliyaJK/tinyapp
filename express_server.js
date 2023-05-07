@@ -13,6 +13,8 @@ app.use(cookieSession({
 
 app.use(express.urlencoded({ extended: true }));
 
+const { getUserByEmail, generateRandomString, urlsForUser } = require("./helpers");
+
 const urlDatabase = {
   "b2xVn2": {
     userID: "6e74hj",
@@ -35,37 +37,6 @@ const users = {
     email: "user2@example.com",
     password: "dishwasher-funk",
   },
-};
-
-//function to return random 6-char string
-const generateRandomString = () => {
-  const charset = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  let result = "";
-  for (let i = 0; i < 6; i++) {
-    result += charset.charAt(Math.floor(Math.random() * charset.length));
-  }
-  return result;
-};
-
-//function to find user in database
-const getUserByEmail = (email) => {
-  for (const user in users) {
-    if (users[user].email === email) {
-      return users[user];
-    }
-  }
-  return null;
-};
-
-//function to return the URLs where the userID is equal to the id of the currently logged-in user
-const urlsForUser = (id) => {
-  const userURLs = {};
-  for (const url in urlDatabase) {
-    if (urlDatabase[url].userID === id) {
-      userURLs[url] = urlDatabase[url].longURL;
-    }
-  }
-  return userURLs;
 };
 
 app.get("/", (req, res) => {
@@ -113,7 +84,7 @@ app.get("/login", (req, res) => {
 
 app.post("/login", (req, res) => {
   const { email, password } = req.body;
-  const user = getUserByEmail(email);
+  const user = getUserByEmail(email, users);
 
   if (!email || !password) {
     return res.status(400).send("Please provide an email and password");
@@ -162,7 +133,7 @@ app.post("/logout", (req, res) => {
 });
 
 app.get('/urls', (req, res) => {
-  userURLs = urlsForUser(req.session.user_id);
+  userURLs = urlsForUser(req.session.user_id, urlDatabase);
   const templateVars = {
     user: users[req.session.user_id],
     urls: userURLs
@@ -187,7 +158,7 @@ app.get("/urls/new", (req, res) => {
 
 app.get("/urls/:id", (req, res) => {
   const user = users[req.session.user_id];
-  const userURLs = urlsForUser(req.session.user_id);
+  const userURLs = urlsForUser(req.session.user_id, urlDatabase);
   if (!user) {
     res.status(401).send("Please login or register");
     return;
@@ -231,7 +202,7 @@ app.get("/u/:id", (req, res) => {
 
 app.post("/urls/:shortURL/delete", (req, res) => {
   const user = users[req.session.user_id];
-  const userURLs = urlsForUser(req.session.user_id);
+  const userURLs = urlsForUser(req.session.user_id, urlDatabase);
   if (!user) {
     res.status(401).send("Please login or register");
     return;
@@ -254,7 +225,7 @@ app.post("/urls/:shortURL/delete", (req, res) => {
 
 app.post("/urls/:id", (req, res) => {
   const user = users[req.session.user_id];
-  const userURLs = urlsForUser(req.session.user_id);
+  const userURLs = urlsForUser(req.session.user_id, urlDatabase);
   if (!user) {
     res.status(401).send("Please login or register");
     return;
