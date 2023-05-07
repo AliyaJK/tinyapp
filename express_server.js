@@ -2,10 +2,14 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const app = express();
 const PORT = 8080;
-const cookieParser = require("cookie-parser");
+const cookieSession = require("cookie-session");
 
 app.set("view engine", "ejs");
-app.use(cookieParser());
+
+app.use(cookieSession({
+  name: "session",
+  keys: ["81vd04rtd"],
+}))
 
 app.use(express.urlencoded({ extended: true }));
 
@@ -65,7 +69,7 @@ const urlsForUser = (id) => {
 };
 
 app.get("/", (req, res) => {
-  if (users[req.cookies.user_id]) {
+  if (users[req.session.user_id]) {
     res.redirect("/urls");
     return;
   }
@@ -90,7 +94,7 @@ app.get("/fetch", (req, res) => {
 });
 
 app.get("/register", (req, res) => {
-  const user = users[req.cookies.user_id];
+  const user = users[req.session.user_id];
   if (user) {
     return res.redirect('/urls');
   }
@@ -99,7 +103,7 @@ app.get("/register", (req, res) => {
 });
 
 app.get("/login", (req, res) => {
-  const user = users[req.cookies.user_id];
+  const user = users[req.session.user_id];
   if (user) {
     return res.redirect('/urls');
   }
@@ -123,7 +127,7 @@ app.post("/login", (req, res) => {
     return res.status(403).send("Password does not match");
   }
 
-  res.cookie("user_id", user.id);
+  req.session.user_id = user.id;
   res.redirect("/urls");
 });
 
@@ -148,22 +152,22 @@ app.post("/register", (req, res) => {
     password: bcrypt.hashSync(req.body.password, 10)
   };
 
-  res.cookie("user_id", id);
+  req.session.user_id = id;
   res.redirect("/urls");
 });
 
 app.post("/logout", (req, res) => {
-  res.clearCookie("user_id");
+  req.session = null;
   res.redirect("/login");
 });
 
 app.get('/urls', (req, res) => {
-  userURLs = urlsForUser(req.cookies.user_id);
+  userURLs = urlsForUser(req.session.user_id);
   const templateVars = {
-    user: users[req.cookies.user_id],
+    user: users[req.session.user_id],
     urls: userURLs
   };
-  const user = users[req.cookies.user_id];
+  const user = users[req.session.user_id];
   if (!user) {
     res.status(401).send("Please login or register");
     return;
@@ -173,7 +177,7 @@ app.get('/urls', (req, res) => {
 });
 
 app.get("/urls/new", (req, res) => {
-  const user = users[req.cookies.user_id];
+  const user = users[req.session.user_id];
   if (!user) {
     return res.redirect('/login');
   }
@@ -182,8 +186,8 @@ app.get("/urls/new", (req, res) => {
 });
 
 app.get("/urls/:id", (req, res) => {
-  const user = users[req.cookies.user_id];
-  const userURLs = urlsForUser(req.cookies.user_id);
+  const user = users[req.session.user_id];
+  const userURLs = urlsForUser(req.session.user_id);
   if (!user) {
     res.status(401).send("Please login or register");
     return;
@@ -199,13 +203,13 @@ app.get("/urls/:id", (req, res) => {
   const templateVars = {
     id: req.params.id,
     longURL: userURLs[req.params.id],
-    user: users[req.cookies.user_id]
+    user: users[req.session.user_id]
   };
   res.render("urls_show", templateVars);
 });
 
 app.post("/urls", (req, res) => {
-  const user = users[req.cookies.user_id];
+  const user = users[req.session.user_id];
   if (!user) {
     return res.status(401).send("You need to be logged in to create new URLs.");
   }
@@ -226,8 +230,8 @@ app.get("/u/:id", (req, res) => {
 });
 
 app.post("/urls/:shortURL/delete", (req, res) => {
-  const user = users[req.cookies.user_id];
-  const userURLs = urlsForUser(req.cookies.user_id);
+  const user = users[req.session.user_id];
+  const userURLs = urlsForUser(req.session.user_id);
   if (!user) {
     res.status(401).send("Please login or register");
     return;
@@ -249,8 +253,8 @@ app.post("/urls/:shortURL/delete", (req, res) => {
 });
 
 app.post("/urls/:id", (req, res) => {
-  const user = users[req.cookies.user_id];
-  const userURLs = urlsForUser(req.cookies.user_id);
+  const user = users[req.session.user_id];
+  const userURLs = urlsForUser(req.session.user_id);
   if (!user) {
     res.status(401).send("Please login or register");
     return;
