@@ -6,51 +6,69 @@ const cookieParser = require("cookie-parser");
 app.set("view engine", "ejs");
 app.use(cookieParser());
 
+app.use(express.urlencoded({ extended: true }));
+
 const urlDatabase = {
-  "b2xVn2": "http://www.lighthouselabs.ca",
-  "9sm5xK": "http://www.google.com"
+  "b2xVn2": {
+    userID: "6e74hj",
+    longURL: "http://www.lighthouselabs.ca"
+  },
+  "9sm5xK": {
+    userID: "3k91nd",
+    longURL: "http://www.google.com"
+  }
 };
 
 const users = {
-  userRandomID: {
-    id: "userRandomID",
+  "6e74hj": {
+    id: "6e74hj",
     email: "user@example.com",
     password: "purple-monkey-dinosaur",
   },
-  user2RandomID: {
-    id: "user2RandomID",
+  "3k91nd": {
+    id: "3k91nd",
     email: "user2@example.com",
     password: "dishwasher-funk",
   },
 };
 
-function generateRandomString() {
+//function to return random 6-char string
+const generateRandomString = () => {
   const charset = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
   let result = "";
   for (let i = 0; i < 6; i++) {
     result += charset.charAt(Math.floor(Math.random() * charset.length));
   }
   return result;
-}
+};
 
+//function to find user in database
 const getUserByEmail = (email) => {
-  for (const id in users) {
-    const user = users[id];
-    if (user.email === email) {
-      return user;
+  for (const user in users) {
+    if (users[user].email === email) {
+      return users[user];
     }
   }
   return null;
 };
 
-app.use(express.urlencoded({ extended: true }));
+//function to return the URLs where the userID is equal to the id of the currently logged-in user
+const urlsForUser = (id) => {
+  const userURLs = {};
+  for (const url in urlDatabase) {
+    if (urlDatabase[url].userID === id) {
+      userURLs[url] = urlDatabase[url].longURL;
+    }
+  }
+  return userURLs;
+};
 
 app.get("/", (req, res) => {
-  res.send("Hello!");
-});
-
-app.listen(PORT, () => {
-  console.log(`Example app listening on port ${PORT}!`);
+  if (users[req.cookies.user_id]) {
+    res.redirect("/urls");
+    return;
+  }
+  res.redirect("/login");
 });
 
 app.get("/urls.json", (req, res) => {
@@ -71,16 +89,20 @@ app.get("/fetch", (req, res) => {
 });
 
 app.get("/register", (req, res) => {
-  const templateVars = {
-    user: users[req.cookies["user_id"]]
-  };
+  const user = users[req.cookies.user_id];
+  if (user) {
+    return res.redirect('/urls');
+  }
+  const templateVars = { user };
   res.render("register", templateVars);
 });
 
 app.get("/login", (req, res) => {
-  const templateVars = {
-    user: users[req.cookies["user_id"]]
-  };
+  const user = users[req.cookies.user_id];
+  if (user) {
+    return res.redirect('/urls');
+  }
+  const templateVars = { user };
   res.render("login", templateVars);
 });
 
@@ -134,41 +156,67 @@ app.post("/logout", (req, res) => {
   res.redirect("/login");
 });
 
-app.get("/urls", (req, res) => {
+app.get('/urls', (req, res) => {
+  userURLs = urlsForUser(req.cookies.user_id);
   const templateVars = {
-    user: users[req.cookies["user_id"]],
-    urls: urlDatabase
+    user: users[req.cookies.user_id],
+    urls: userURLs
   };
+  const user = users[req.cookies.user_id];
+  if (!user) {
+    res.status(401).send("Please login or register");
+    return;
+  }
+
   res.render("urls_index", templateVars);
 });
 
 app.get("/urls/new", (req, res) => {
-  const templateVars = {
-    user: users[req.cookies["user_id"]],
-  };
+  const user = users[req.cookies.user_id];
+  if (!user) {
+    return res.redirect('/login');
+  }
+  const templateVars = { user, longURL: "" };
   res.render("urls_new", templateVars);
 });
 
 app.get("/urls/:id", (req, res) => {
+  const user = users[req.cookies.user_id];
+  const userURLs = urlsForUser(req.cookies.user_id);
+  if (!user) {
+    res.status(401).send("Please login or register");
+    return;
+  }
+  if (!urlDatabase[req.params.id]) {
+    res.status(404).send("Short URL not found");
+    return;
+  }
+  if (!userURLs[req.params.id]) {
+    res.status(403).send("You do not have permissions for this short URL");
+    return;
+  }
   const templateVars = {
     id: req.params.id,
-    longURL: urlDatabase[req.params.id],
-    user: users[req.cookies["user_id"]],
+    longURL: userURLs[req.params.id],
+    user: users[req.cookies.user_id]
   };
   res.render("urls_show", templateVars);
 });
 
 app.post("/urls", (req, res) => {
-  const longURL = req.body.longURL;
+  const user = users[req.cookies.user_id];
+  if (!user) {
+    return res.status(401).send("You need to be logged in to create new URLs.");
+  }
   const shortURL = generateRandomString();
-  urlDatabase[shortURL] = longURL;
-  res.render("/urls", templateVars);
+  const longURL = req.body.longURL;
+  urlDatabase[shortURL] = { longURL, userID: user.id };
   res.redirect(`/urls/${shortURL}`);
 });
 
 app.get("/u/:id", (req, res) => {
   const shortURL = req.params.id;
-  const longURL = urlDatabase[shortURL];
+  const longURL = urlDatabase[shortURL].longURL;
   if (longURL) {
     res.redirect(longURL);
   } else {
@@ -177,6 +225,20 @@ app.get("/u/:id", (req, res) => {
 });
 
 app.post("/urls/:shortURL/delete", (req, res) => {
+  const user = users[req.cookies.user_id];
+  const userURLs = urlsForUser(req.cookies.user_id);
+  if (!user) {
+    res.status(401).send("Please login or register");
+    return;
+  }
+  if (!urlDatabase[req.params.id]) {
+    res.status(404).send("Short URL not found");
+    return;
+  }
+  if (!userURLs[req.params.id]) {
+    res.status(403).send("You do not have permissions for this short URL");
+    return;
+  }
   const shortURL = req.params.shortURL;
   delete urlDatabase[shortURL];
   const templateVars = {
@@ -186,9 +248,26 @@ app.post("/urls/:shortURL/delete", (req, res) => {
 });
 
 app.post("/urls/:id", (req, res) => {
+  const user = users[req.cookies.user_id];
+  const userURLs = urlsForUser(req.cookies.user_id);
+  if (!user) {
+    res.status(401).send("Please login or register");
+    return;
+  }
+  if (!urlDatabase[req.params.id]) {
+    res.status(404).send("Short URL not found");
+    return;
+  }
+  if (!userURLs[req.params.id]) {
+    res.status(403).send("You do not have permissions for this short URL");
+    return;
+  }
   const longURL = req.body.longURL;
   const shortURL = req.params.id;
   urlDatabase[shortURL] = longURL;
   res.redirect("/urls");
 });
 
+app.listen(PORT, () => {
+  console.log(`Example app listening on port ${PORT}!`);
+});
