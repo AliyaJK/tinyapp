@@ -1,4 +1,5 @@
 const express = require("express");
+const bcrypt = require("bcryptjs");
 const app = express();
 const PORT = 8080;
 const cookieParser = require("cookie-parser");
@@ -118,7 +119,7 @@ app.post("/login", (req, res) => {
     return res.status(403).send("No user with that email found");
   }
 
-  if (password !== user.password) {
+  if (!bcrypt.compareSync(password, user.password)) {
     return res.status(403).send("Password does not match");
   }
 
@@ -144,7 +145,7 @@ app.post("/register", (req, res) => {
   users[id] = {
     id,
     email,
-    password
+    password: bcrypt.hashSync(req.body.password, 10)
   };
 
   res.cookie("user_id", id);
