@@ -157,9 +157,8 @@ app.get("/urls/new", (req, res) => {
 });
 
 app.get("/urls/:id", (req, res) => {
-  const user = users[req.session.user_id];
   const userURLs = urlsForUser(req.session.user_id, urlDatabase);
-  if (!user) {
+  if (!req.session.user_id) {
     res.status(401).send("Please login or register");
     return;
   }
@@ -238,9 +237,7 @@ app.post("/urls/:id", (req, res) => {
     res.status(403).send("You do not have permissions for this short URL");
     return;
   }
-  const longURL = req.body.longURL;
-  const shortURL = req.params.id;
-  urlDatabase[shortURL] = longURL;
+  urlDatabase[req.params.id].longURL = req.body.longURL;
   res.redirect("/urls");
 });
 
